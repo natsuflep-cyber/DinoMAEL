@@ -1,0 +1,287 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Retro Bird - Jogue Grátis</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Courier New', Courier, monospace;
+        }
+
+        body {
+            background-color: #222;
+            color: #fff;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            overflow: hidden;
+        }
+
+        h1 {
+            margin-bottom: 10px;
+            color: #ff9900;
+            text-shadow: 2px 2px #000;
+        }
+
+        #game-container {
+            position: relative;
+            width: 400px;
+            height: 500px;
+            border: 4px solid #fff;
+            background-color: #70c5ce; /* Azul céu retrô */
+            overflow: hidden;
+        }
+
+        canvas {
+            display: block;
+        }
+
+        /* Tela de Game Over e Anúncio */
+        #game-over-screen {
+            display: none;
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.8);
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            text-align: center;
+            padding: 20px;
+        }
+
+        #game-over-screen h2 {
+            color: #ff3333;
+            font-size: 32px;
+            margin-bottom: 10px;
+            text-shadow: 2px 2px #000;
+        }
+
+        .btn-restart {
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            font-size: 18px;
+            font-weight: bold;
+            cursor: pointer;
+            border-bottom: 4px solid #2E7D32;
+            margin-top: 15px;
+        }
+
+        .btn-restart:active {
+            border-bottom: 2px solid #2E7D32;
+            transform: translateY(2px);
+        }
+
+        /* Espaço do Anúncio Google AdSense */
+        .adsense-placeholder {
+            width: 300px;
+            height: 250px;
+            background-color: #333;
+            border: 2px dashed #666;
+            margin: 15px 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 12px;
+            color: #aaa;
+        }
+    </style>
+</head>
+<body>
+
+    <h1>RETRO BIRD</h1>
+    <p style="margin-bottom: 15px; color: #ccc;">Pressione <b>ESPAÇO</b> ou <b>CLIQUE</b> para voar</p>
+
+    <div id="game-container">
+        <canvas id="gameCanvas" width="400" height="500"></canvas>
+
+        <!-- TELA DE GAME OVER (ONDE O ANÚNCIO APARECE) -->
+        <div id="game-over-screen" id="gameOverScreen">
+            <h2>FIM DE JOGO</h2>
+            <p id="final-score">Pontos: 0</p>
+            
+            <!-- ESPAÇO DO ANÚNCIO -->
+            <div class="adsense-placeholder">
+                <!-- ADVERTISMENT BLOCK -->
+                <span id="ad-text">[Espaço do Anúncio AdSense (300x250)]</span>
+                
+                <!-- COLE O SEU CÓDIGO DO ADSENSE AQUI NO FUTURO -->
+                <!-- 
+                <ins class="adsandbox" ...></ins>
+                <script>(adsbygoogle = window.adsbygoogle || []).push({});</script> 
+                -->
+            </div>
+
+            <button class="btn-restart" onclick="resetGame()">JOGAR DE NOVO</button>
+        </div>
+    </div>
+
+    <script>
+        const canvas = document.getElementById("gameCanvas");
+        const ctx = canvas.getContext("2d");
+        const gameOverScreen = document.getElementById("game-over-screen");
+        const finalScoreText = document.getElementById("final-score");
+
+        // Configurações do Jogo (Dificuldade Média)
+        let bird = { x: 50, y: 150, width: 30, height: 24, gravity: 0.4, lift: -6.5, velocity: 0 };
+        let pipes = [];
+        let pipeWidth = 60;
+        let pipeGap = 130; // Espaço médio entre os canos
+        let pipeSpeed = 2.5;
+        let frameCount = 0;
+        let score = 0;
+        let gameOver = false;
+
+        // Controles
+        function jump() {
+            if (!gameOver) {
+                bird.velocity = bird.lift;
+            }
+        }
+
+        window.addEventListener("keydown", (e) => { if (e.code === "Space") jump(); });
+        canvas.addEventListener("click", jump);
+
+        function spawnPipe() {
+            let minHeight = 50;
+            let maxHeight = canvas.height - pipeGap - 50;
+            let height = Math.floor(Math.random() * (maxHeight - minHeight + 1)) + minHeight;
+
+            pipes.push({
+                x: canvas.width,
+                top: height,
+                bottom: canvas.height - (height + pipeGap),
+                passed: false
+            });
+        }
+
+        function update() {
+            if (gameOver) return;
+
+            frameCount++;
+            bird.velocity += bird.gravity;
+            bird.y += bird.velocity;
+
+            // Limites do teto e chão
+            if (bird.y + bird.height > canvas.height || bird.y < 0) {
+                endGame();
+            }
+
+            if (frameCount % 100 === 0) {
+                spawnPipe();
+            }
+
+            for (let i = pipes.length - 1; i >= 0; i--) {
+                pipes[i].x -= pipeSpeed;
+
+                // Colisão Retrô (Hitbox em bloco)
+                if (
+                    bird.x < pipes[i].x + pipeWidth &&
+                    bird.x + bird.width > pipes[i].x &&
+                    (bird.y < pipes[i].top || bird.y + bird.height > canvas.height - pipes[i].bottom)
+                ) {
+                    endGame();
+                }
+
+                // Pontuação
+                if (!pipes[i].passed && pipes[i].x + pipeWidth < bird.x) {
+                    score++;
+                    pipes[i].passed = true;
+                }
+
+                // Deletar canos fora da tela
+                if (pipes[i].x + pipeWidth < 0) {
+                    pipes.splice(i, 1);
+                }
+            }
+        }
+
+        function draw() {
+            // Limpar tela (Céu)
+            ctx.fillStyle = "#70c5ce";
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            // Desenhar Nuvens Retrô de Fundo
+            ctx.fillStyle = "rgba(255,255,255,0.4)";
+            ctx.fillRect(80, 80, 60, 20); ctx.fillRect(260, 120, 80, 25);
+
+            // Desenhar Canos (Verde Retrô)
+            ctx.fillStyle = "#73bf2e";
+            for (let pipe of pipes) {
+                // Cano Superior
+                ctx.fillRect(pipe.x, 0, pipeWidth, pipe.top);
+                ctx.strokeStyle = "#000";
+                ctx.lineWidth = 3;
+                ctx.strokeRect(pipe.x, 0, pipeWidth, pipe.top);
+
+                // Cano Inferior
+                ctx.fillRect(pipe.x, canvas.height - pipe.bottom, pipeWidth, pipe.bottom);
+                ctx.strokeRect(pipe.x, canvas.height - pipe.bottom, pipeWidth, pipe.bottom);
+            }
+
+            // Desenhar Pássaro Retrô (Pixel Art Amarelo)
+            ctx.fillStyle = "#f7d016"; // Corpo
+            ctx.fillRect(bird.x, bird.y, bird.width, bird.height);
+            ctx.strokeStyle = "#000";
+            ctx.strokeRect(bird.x, bird.y, bird.width, bird.height);
+            
+            ctx.fillStyle = "#ff5500"; // Bico
+            ctx.fillRect(bird.x + bird.width - 6, bird.y + 8, 8, 8);
+            ctx.fillStyle = "#fff"; // Olho
+            ctx.fillRect(bird.x + 16, bird.y + 4, 6, 6);
+
+            // Placar na tela
+            ctx.fillStyle = "#fff";
+            ctx.font = "bold 24px 'Courier New'";
+            ctx.shadowColor = "#000";
+            ctx.shadowBlur = 4;
+            ctx.fillText(`Pontos: ${score}`, 15, 35);
+            ctx.shadowBlur = 0; // reset
+        }
+
+        function gameLoop() {
+            update();
+            draw();
+            if (!gameOver) {
+                requestAnimationFrame(gameLoop);
+            }
+        }
+
+        function endGame() {
+            gameOver = true;
+            finalScoreText.innerText = `Pontos: ${score}`;
+            gameOverScreen.style.display = "flex";
+            
+            // LOGICA DO ANÚNCIO:
+            // Toda vez que cai aqui, se o script do AdSense estiver ativo, o anúncio atualiza/recarrega.
+            if (typeof adsbygoogle !== "undefined") {
+                 (adsbygoogle = window.adsbygoogle || []).push({});
+            }
+        }
+
+        function resetGame() {
+            bird = { x: 50, y: 150, width: 30, height: 24, gravity: 0.4, lift: -6.5, velocity: 0 };
+            pipes = [];
+            frameCount = 0;
+            score = 0;
+            gameOver = false;
+            gameOverScreen.style.display = "none";
+            gameLoop();
+        }
+
+        // Iniciar o jogo automaticamente
+        spawnPipe();
+        gameLoop();
+    </script>
+</body>
+</html>
